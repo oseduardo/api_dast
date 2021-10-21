@@ -3,17 +3,55 @@
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
 
+#This a pipeline for testing Veracode DAST using APIs
+
 trigger:
-- master
+ branches:
+   include:
+#   - refs/heads/master
+#   - refs/heads/dev
+   - refs/heads/featureX
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+stages:
+# In Veracode Stage it will execute Pipeline Scan or Sandbox Scan or Policy Scan depending on the branch under execution, which could be
+# 'featureX' or 'dev' or 'master' respectively.
+- stage: Veracode_DAST
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+  jobs:
+  - job: VeracodeDASTKickOff
+
+    variables:
+    - name: dastScanName
+      value: DVWA_DAST_Scan_$(Build.BuildNumber)
+
+    steps:
+
+    - task: CmdLine@2
+      displayName: HMAC Signing
+      inputs:
+        script: |
+          echo '[INFO] ------------------------------------------------------------------------'
+          echo '[INFO] --- RUNNING HMAC SIGNING...'
+          echo '[INFO] ------------------------------------------------------------------------'
+          ./veracode-HMAC-Signing.sh $(VID) $(VKEY)
+
+    - task: CmdLine@2
+      displayName: DAST Scan KickOff
+      inputs:
+        script: |
+          echo '[INFO] ------------------------------------------------------------------------'
+          echo '[INFO] --- RUNNING DAST SCAN KICKOFF...'
+          echo '[INFO] ------------------------------------------------------------------------'
+          ./veracode-DAST-Scan.sh $(dastScanName) http://lisbon.cloudloop.veracodelabs.com/dvwa
+
+    - task: CmdLine@2
+      displayName: DAST App Linking
+      inputs:
+        script: |
+          echo '[INFO] ------------------------------------------------------------------------'
+          echo '[INFO] --- LINKING DAST SCAN WITH AN APP PROFILE...'
+          echo '[INFO] ------------------------------------------------------------------------'
+          ./veracode-DAST-AppLinking.sh $(VID) $(VKEY) $(dastScanName) DVWA
